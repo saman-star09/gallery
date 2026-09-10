@@ -1,5 +1,5 @@
 import './style.css';
-import { isConfigured } from './lib/supabaseClient';
+import { configError, isConfigured } from './lib/supabaseClient';
 import { onAuthChange } from './lib/auth';
 import { deletePhoto, listPhotos, subscribeToPhotos, updateCaption } from './lib/photos';
 import type { Photo } from './lib/types';
@@ -18,8 +18,27 @@ if (!isConfigured) {
       <p>Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> — see the README for setup steps.</p>
     </div>
   `;
+} else if (configError) {
+  app.innerHTML = `
+    <div class="config-warning">
+      <h1>Supabase credentials look malformed</h1>
+      <p>The Supabase client couldn't be created from the configured values.</p>
+      <p><code>${configError.replace(/</g, '&lt;')}</code></p>
+      <p>Double-check <code>VITE_SUPABASE_URL</code> / <code>VITE_SUPABASE_ANON_KEY</code> for stray quotes, extra whitespace, or a missing "https://".</p>
+    </div>
+  `;
 } else {
-  bootGallery();
+  try {
+    bootGallery();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    app.innerHTML = `
+      <div class="config-warning">
+        <h1>Something went wrong starting the gallery</h1>
+        <p><code>${message.replace(/</g, '&lt;')}</code></p>
+      </div>
+    `;
+  }
 }
 
 function bootGallery(): void {
