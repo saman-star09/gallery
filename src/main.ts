@@ -1,88 +1,124 @@
-import * as THREE from 'three';
 import './style.css';
-import { createRenderers } from './scene/renderers';
-import { createStarfield } from './scene/Starfield';
-import { FlightControls } from './scene/FlightControls';
-import { GalleryFrame } from './frames/Frame';
-import { buildFrameConfigs, SPAWN_POINT } from './frames/frameConfigs';
-import { Hud } from './ui/Hud';
+import { isConfigured } from './lib/supabaseClient';
+import { onAuthChange } from './lib/auth';
+import { deletePhoto, listPhotos, subscribeToPhotos, updateCaption } from './lib/photos';
+import type { Photo } from './lib/types';
+import { Lightbox } from './components/Lightbox';
+import { Masonry } from './components/Masonry';
+import { Topbar } from './components/Topbar';
+import { UploadZone } from './components/UploadZone';
 
-const container = document.querySelector<HTMLDivElement>('#scene-container')!;
-const { webgl, css3d, camera } = createRenderers(container);
-camera.position.copy(SPAWN_POINT);
+const app = document.querySelector<HTMLDivElement>('#app')!;
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x15100b);
-scene.fog = new THREE.FogExp2(0x15100b, 0.012);
-
-scene.add(createStarfield());
-scene.add(new THREE.HemisphereLight(0x8a7355, 0x120d09, 0.55));
-const key = new THREE.PointLight(0xffe9c7, 1.15, 60);
-key.position.set(4, 6, 10);
-scene.add(key);
-
-const frames = buildFrameConfigs().map((opts) => new GalleryFrame(opts));
-for (const frame of frames) scene.add(frame.group);
-
-const controls = new FlightControls(camera, webgl.domElement);
-const hud = new Hud(document.querySelector<HTMLDivElement>('#app')!, () => {
-  webgl.domElement.requestPointerLock()?.catch(() => {});
-});
-controls.onLockChange = (locked) => hud.setLocked(locked);
-
-let statusAnnounced = false;
-function updateConnectionStatus(): void {
-  const live = frames.filter((f) => f.status === 'live').length;
-  const errored = frames.filter((f) => f.status === 'error').length;
-  if (live === 0 && errored === 0) {
-    hud.setConnectionStatus('Connecting to Earth-observation feeds…');
-    return;
-  }
-  statusAnnounced = true;
-  if (errored === 0) {
-    hud.setConnectionStatus(`${live}/${frames.length} feeds live`);
-  } else if (live === 0) {
-    hud.setConnectionStatus(`Feeds unreachable — this sandbox may block outbound internet`);
-  } else {
-    hud.setConnectionStatus(`${live}/${frames.length} feeds live · ${errored} interrupted`);
-  }
+if (!isConfigured) {
+  app.innerHTML = `
+    <div class="config-warning">
+      <h1>Almost there</h1>
+      <p>This gallery needs Supabase credentials before it can show or accept photos.</p>
+      <p>Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> — see the README for setup steps.</p>
+    </div>
+  `;
+} else {
+  bootGallery();
 }
 
-function updateFocus(): void {
-  const nearest = frames.reduce<GalleryFrame | null>((best, f) => (best === null || f.currentProximity > best.currentProximity ? f : best), null);
+function bootGallery(): void {
+  let photos: Photo[] = [];
+  let ownerId: string | null = null;
 
-  if (!nearest || nearest.currentProximity < 0.15) {
-    hud.hideFocus();
-    return;
+  const lightbox = new Lightbox({
+    onDelete: async (photo) => {
+      await deletePhoto(photo);
+      photos = photos.filter((p) => p.id !== photo.id);
+      masonry.remove(photo.id);
+      lightbox.syncPhotos(photos);
+      topbar.setCount(photos.length);
+      updateEmptyState();
+    },
+    onCaptionChange: async (photo, caption) => {
+      await updateCaption(photo.id, caption);
+      photos = photos.map((p) => (p.id === photo.id ? { ...p, caption: caption || null } : p));
+      masonry.updateCaption(photo.id, caption || null);
+      lightbox.syncPhotos(photos);
+    },
+  });
+
+  const masonry = new Masonry((id) => lightbox.open(photos, id));
+
+  const uploadZone = new UploadZone(
+    (photo) => addPhoto(photo),
+    (message) => showToast(message),
+  );
+
+  const topbar = new Topbar(uploadZone.button);
+
+  const emptyState = document.createElement('div');
+  emptyState.className = 'empty-state';
+
+  app.append(topbar.el, uploadZone.overlayElement, masonry.el, emptyState, lightbox.el);
+
+  function addPhoto(photo: Photo): void {
+    if (masonry.has(photo.id)) return;
+    photos = [photo, ...photos];
+    masonry.prepend(photo);
+    topbar.setCount(photos.length);
+    updateEmptyState();
   }
-  const result = nearest.lastResult;
-  if (result) {
-    hud.showFocus(`${nearest.title}`, `${result.sourceLabel} — ${result.caption}`);
-  } else {
-    hud.showFocus(nearest.title, 'Establishing uplink…');
+
+  function updateEmptyState(): void {
+    emptyState.hidden = photos.length > 0;
+    emptyState.textContent = ownerId ? 'No photos yet — drop some in, or use "+ Add Photos".' : 'No photos yet.';
   }
-}
 
-const timer = new THREE.Timer();
-timer.connect(document);
-function animate(timestamp: number): void {
-  requestAnimationFrame(animate);
-  timer.update(timestamp);
-  const dt = Math.min(timer.getDelta(), 0.1);
-  const now = performance.now();
+  function showToast(message: string): void {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    app.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
 
-  controls.update(dt);
-  for (const frame of frames) frame.update(camera.position, now);
+  onAuthChange((session) => {
+    ownerId = session?.user.id ?? null;
+    topbar.setSession(session?.user.email ?? null);
+    uploadZone.setOwner(ownerId);
+    lightbox.setOwner(Boolean(ownerId));
+    updateEmptyState();
+  });
 
-  updateFocus();
-  if (!statusAnnounced || frames.some((f) => f.status !== 'loading')) updateConnectionStatus();
+  listPhotos()
+    .then((initial) => {
+      photos = initial;
+      masonry.setPhotos(photos);
+      topbar.setCount(photos.length);
+      updateEmptyState();
+    })
+    .catch((err) => showToast(err instanceof Error ? err.message : 'Could not load photos'));
 
-  webgl.render(scene, camera);
-  css3d.render(scene, camera);
-}
+  subscribeToPhotos(
+    (photo) => addPhoto(photo),
+    (id) => {
+      photos = photos.filter((p) => p.id !== id);
+      masonry.remove(id);
+      lightbox.syncPhotos(photos);
+      topbar.setCount(photos.length);
+      updateEmptyState();
+    },
+  );
 
-requestAnimationFrame(animate);
-
-if (import.meta.env.DEV) {
-  (window as unknown as { __gallery: unknown }).__gallery = { camera, controls, frames, scene };
+  if (import.meta.env.DEV) {
+    (window as unknown as { __gallery: unknown }).__gallery = {
+      masonry,
+      lightbox,
+      topbar,
+      uploadZone,
+      addPhoto,
+      setOwnerForTesting: (id: string | null) => {
+        ownerId = id;
+        uploadZone.setOwner(id);
+        lightbox.setOwner(Boolean(id));
+        updateEmptyState();
+      },
+    };
+  }
 }

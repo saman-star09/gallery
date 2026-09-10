@@ -1,84 +1,125 @@
-# The Living Satellite Ghost Gallery
+# My Gallery
 
-A zero-gravity 3D gallery whose frames aren't photos — they're live windows onto
-public Earth-observation satellites. Fly up to a frame and it fetches whatever
-that satellite (or the sun-lit face of the whole planet) looked like most
-recently, right there in your browser.
+A Pinterest-style photo gallery: a waterfall masonry grid, click a photo to
+view it full-size with a caption, drag-and-drop (or a button) to post new
+ones. Anyone who visits can view the gallery; only you, signed in, can post
+or delete photos.
 
-This is a working prototype of one gallery concept from a larger brainstorm
-(*"Orbital Perspective"*), built with real public APIs rather than mocked data.
+It's a static site (Vite + TypeScript, no server of its own) backed by
+[Supabase](https://supabase.com) for storage, the photo list, auth, and live
+updates — so photos are visible from any device, not just the browser you
+uploaded from.
 
-## What's actually live
+## One-time setup (Supabase)
 
-| Frame | Source | Update cadence | Notes |
-|---|---|---|---|
-| **The Whole Earth, Right Now** | [NASA EPIC](https://epic.gsfc.nasa.gov/about/api) — DSCOVR at the Sun-Earth L1 point | ~1–2 hours | Full sunlit disc of Earth. No API key required. |
-| **GOES-16 — Americas, Live** | [NOAA GOES-East GeoColor](https://www.star.nesdis.noaa.gov/GOES/) | ~10 minutes | Static `latest.jpg`, cache-busted on every fetch. |
-| **GOES-18 — Pacific, Live** | [NOAA GOES-West GeoColor](https://www.star.nesdis.noaa.gov/GOES/) | ~10 minutes | Same as above, Pacific hemisphere. |
-| **Nearest Satellite Pass** | [CelesTrak](https://celestrak.org/) TLEs + real SGP4 propagation ([satellite.js](https://github.com/shashwatak/satellite-js)), imagery via [NASA GIBS](https://nasa-gibs.github.io/gibs-api-docs/) | ~1 minute | Computes the real current position of 8 tracked EO satellites and fetches a near-real-time tile centered on whichever is nearest to you. |
+You need your own free Supabase project — this is *your* gallery's data, so
+it lives in an account you control.
 
-The last frame is the literal version of the "telescope aperture" idea: it
-runs actual orbital mechanics client-side to find which real satellite
-(Terra, Aqua, Suomi NPP, NOAA-20, Landsat 8/9, Sentinel-2A/B) is closest to a
-reference point (your geolocation if you allow it, otherwise Greenwich), then
-asks GIBS for a near-real-time scan of that spot. Flying closer to the frame
-requests a higher WMTS zoom level of the same location — a real "zoom deeper
-into the live feed" driven by your position in the room, not a canned effect.
-If CelesTrak's TLE catalog can't be reached, this frame falls back to a
-physically-shaped simulated ground track (documented in
-`src/data/satelliteTracker.ts`) and is clearly labeled *"simulated orbit"*
-rather than pretending to be live.
+1. Create a project at [supabase.com](https://supabase.com) (the free tier is
+   plenty for this).
+2. **Database** — open the SQL Editor and run:
 
-## Why CSS3D, not WebGL textures
+   ```sql
+   create table public.photos (
+     id uuid primary key default gen_random_uuid(),
+     storage_path text not null,
+     width integer not null,
+     height integer not null,
+     caption text,
+     owner_id uuid not null references auth.users (id) default auth.uid(),
+     created_at timestamptz not null default now()
+   );
 
-Cross-origin satellite images generally aren't served with
-`Access-Control-Allow-Origin`, so loading them as WebGL textures would taint
-the canvas. Instead, the room and frame borders are drawn with
-`THREE.WebGLRenderer`, and each frame's actual image is a real `<img>`
-element positioned in 3D space via `THREE.CSS3DRenderer` — the same
-dual-renderer technique three.js's own CSS3D examples use. Plain `<img>` tags
-display cross-origin content without needing CORS headers, so the gallery
-works with imagery hosts that were never built for WebGL.
+   alter table public.photos enable row level security;
 
-## Controls
+   create policy "Anyone can view photos"
+     on public.photos for select
+     using (true);
 
-- Click to enter — mouse looks around, `W A S D` thrusts along your view direction
-- `Space` / `Shift` — thrust up / down
-- `Esc` — release the cursor
-- Movement has inertia (zero gravity): you drift and decelerate rather than stopping instantly
-- Drift close to a frame to focus it — the HUD shows its source and caption, and it re-fetches the freshest imagery available at that moment
+   create policy "Authenticated users can add photos"
+     on public.photos for insert
+     to authenticated
+     with check (auth.uid() = owner_id);
 
-## Running it
+   create policy "Owners can update their photos"
+     on public.photos for update
+     to authenticated
+     using (auth.uid() = owner_id);
+
+   create policy "Owners can delete their photos"
+     on public.photos for delete
+     to authenticated
+     using (auth.uid() = owner_id);
+
+   -- powers the live "new photo just appeared" sync
+   alter publication supabase_realtime add table public.photos;
+   ```
+
+3. **Storage** — go to Storage → Create a new bucket named `photos`, and
+   check **Public bucket** (so photos load directly by URL). Then, back in
+   the SQL Editor:
+
+   ```sql
+   create policy "Public can view photo files"
+     on storage.objects for select
+     using (bucket_id = 'photos');
+
+   create policy "Authenticated users can upload photos"
+     on storage.objects for insert
+     to authenticated
+     with check (bucket_id = 'photos');
+
+   create policy "Owners can delete their photo files"
+     on storage.objects for delete
+     to authenticated
+     using (bucket_id = 'photos' and owner = auth.uid());
+   ```
+
+4. **Your login** — there's deliberately no public sign-up form (so a
+   stranger can't register and start posting). Create your own account
+   instead: Authentication → Users → **Add user**, enter an email and
+   password, and check **Auto Confirm User**. That's the account you'll sign
+   in with on the site.
+5. **Keys** — under Project Settings → API, copy the **Project URL** and the
+   **anon public** key. (The anon key is meant to be public — it's what's
+   embedded in the site's JS; actual access control comes from the RLS
+   policies above, not from keeping that key secret.)
+
+## Running it locally
 
 ```bash
+cp .env.example .env.local   # then paste in your Project URL + anon key
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # production build to dist/
-npm run preview  # serve the production build
+npm run dev
 ```
 
-No API keys or environment variables are required — every data source here is
-free and open access.
+## Deploying (GitHub Pages)
 
-## Known limitations
+The included `.github/workflows/deploy-pages.yml` builds the site and
+publishes it automatically on every push. Two things need to be set once:
 
-- **Network access.** All four frames need outbound internet to their
-  respective public APIs. Locked-down environments (including the sandbox
-  this was developed in, which only allowlists npm/GitHub) will show every
-  frame in its "uplink interrupted" state — that's the app's real error path,
-  not a bug, and it retries with backoff.
-- **GIBS tile availability.** Near-real-time processing can lag a few hours;
-  the GIBS-based frame cascades through a couple of fallback zoom levels and
-  the previous day before giving up.
-- **Simulated fallback isn't tracking.** When CelesTrak is unreachable, the
-  "Nearest Satellite Pass" frame shows a physically-realistic but illustrative
-  ground track, not that satellite's true current position — it's labeled as
-  such in the HUD.
-- **Bundle size.** `satellite.js` ships an optional WASM acceleration path
-  that gets bundled in; the production build is ~600 KB (~160 KB gzipped).
-  Fine for a prototype; a follow-up could lazy-load `satelliteTracker.ts`.
-- **Multiplayer "shared magnification"** from the original concept (two
-  visitors standing near a frame zoom it further together) isn't implemented
-  — it needs a realtime presence backend this static front-end prototype
-  doesn't have. The solo version (your own proximity drives zoom) is real and
-  working.
+1. **Repo secrets** — Settings → Secrets and variables → Actions → add
+   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` with the same values as
+   your `.env.local`. They're baked into the build the same way the anon key
+   always is — safe by design, but keeping them as secrets rather than
+   hardcoded is still good hygiene.
+2. **Pages source** — Settings → Pages → Build and deployment → Source →
+   **GitHub Actions**. (If this is still set to "Deploy from a branch," the
+   site will publish the raw, unbuilt source and show a blank page.)
+
+## How it works
+
+- **Viewing** is public and unauthenticated — the grid loads every row from
+  the `photos` table and renders each as a masonry card via CSS `columns`
+  (no layout library needed).
+- **Posting** uploads the image file straight to Supabase Storage from the
+  browser, reads its natural width/height (used to reserve the right space
+  in the grid before the image finishes loading, avoiding layout shift), and
+  inserts a row referencing it — gated by the RLS policies above to your
+  signed-in user only.
+- **Live sync** subscribes to Postgres changes on `photos` via Supabase
+  Realtime, so a photo posted from your phone shows up in an already-open
+  tab on your laptop without a refresh.
+- **Auth** is email/password only, with no self-serve sign-up screen in the
+  app — the one account is created directly in the Supabase dashboard, by
+  design.
