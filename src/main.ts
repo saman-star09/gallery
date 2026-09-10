@@ -12,12 +12,12 @@ const { webgl, css3d, camera } = createRenderers(container);
 camera.position.copy(SPAWN_POINT);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03040a);
-scene.fog = new THREE.FogExp2(0x03040a, 0.012);
+scene.background = new THREE.Color(0x15100b);
+scene.fog = new THREE.FogExp2(0x15100b, 0.012);
 
 scene.add(createStarfield());
-scene.add(new THREE.HemisphereLight(0x3a5aff, 0x0a0a12, 0.6));
-const key = new THREE.PointLight(0xffffff, 1.2, 60);
+scene.add(new THREE.HemisphereLight(0x8a7355, 0x120d09, 0.55));
+const key = new THREE.PointLight(0xffe9c7, 1.15, 60);
 key.position.set(4, 6, 10);
 scene.add(key);
 

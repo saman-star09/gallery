@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** A sparse, drifting star shell — the WebGL layer stays mostly transparent-black so CSS3D frame content always reads clearly against it. */
-export function createStarfield(count = 4000, radius = 900): THREE.Points {
+export function createStarfield(count = 2600, radius = 900): THREE.Points {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const tint = new THREE.Color();
@@ -16,7 +16,7 @@ export function createStarfield(count = 4000, radius = 900): THREE.Points {
     positions[i * 3 + 2] = r * Math.cos(phi);
 
     const warmth = Math.random();
-    tint.setHSL(0.55 + warmth * 0.15, 0.35, 0.6 + Math.random() * 0.4);
+    tint.setHSL(0.08 + warmth * 0.04, 0.28, 0.68 + Math.random() * 0.28);
     colors[i * 3] = tint.r;
     colors[i * 3 + 1] = tint.g;
     colors[i * 3 + 2] = tint.b;
@@ -30,7 +30,7 @@ export function createStarfield(count = 4000, radius = 900): THREE.Points {
     size: 1.6,
     vertexColors: true,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.6,
     sizeAttenuation: true,
   });
 

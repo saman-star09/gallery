@@ -94,7 +94,7 @@ export class GalleryFrame {
       void this.refresh();
     }
 
-    this.borderMaterial.emissiveIntensity = 0.35 + this.proximity * 0.9;
+    this.borderMaterial.emissiveIntensity = 0.12 + this.proximity * 0.35;
   }
 
   get currentProximity(): number {
@@ -211,11 +211,11 @@ function buildBorderMesh(width: number, height: number, accentColor: number): TH
   geometry.translate(0, 0, -depth / 2);
 
   const material = new THREE.MeshStandardMaterial({
-    color: 0x0b0e14,
-    metalness: 0.6,
-    roughness: 0.35,
+    color: 0x2b2016,
+    metalness: 0.08,
+    roughness: 0.8,
     emissive: new THREE.Color(accentColor),
-    emissiveIntensity: 0.35,
+    emissiveIntensity: 0.12,
   });
 
   return new THREE.Mesh(geometry, material);

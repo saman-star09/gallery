@@ -1,9 +1,11 @@
 :root {
   color-scheme: dark;
-  --bg: #030409;
-  --panel-bg: rgba(8, 11, 20, 0.72);
-  --text: #e8ecf5;
-  --muted: #8b93a8;
+  --bg: #16110c;
+  --panel-bg: rgba(232, 219, 197, 0.94);
+  --panel-border: rgba(58, 42, 27, 0.16);
+  --text: #efe4d3;
+  --panel-text: #3c2c1e;
+  --muted: #8f7c65;
 }
 
 * {
@@ -34,11 +36,11 @@ body {
 
 .gallery-frame {
   position: relative;
-  background: #05070c;
-  border-radius: 6px;
+  background: #e6d9c2;
+  border-radius: 3px;
   overflow: hidden;
   font-family: inherit;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 30px rgba(20, 14, 8, 0.5);
 }
 
 .gallery-frame__media {
@@ -62,12 +64,12 @@ body {
   text-align: center;
   padding: 24px;
   font-size: 15px;
-  color: var(--muted);
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 70%);
+  color: #7a6a54;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.15), transparent 70%);
 }
 
 .gallery-frame[data-status='error'] .gallery-frame__status {
-  color: #ff8a80;
+  color: #a5573f;
 }
 
 .gallery-frame__titlebar {
@@ -82,7 +84,8 @@ body {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent);
+  color: #f2e8d8;
+  background: linear-gradient(to bottom, rgba(26, 18, 11, 0.78), transparent);
 }
 
 .gallery-frame__dot {
@@ -95,19 +98,19 @@ body {
 }
 
 .gallery-frame__dot[data-status='live'] {
-  background: #5cff9d;
-  box-shadow: 0 0 8px #5cff9d;
+  background: #8fa06a;
+  box-shadow: 0 0 8px #8fa06a;
   animation: pulse 2.2s ease-in-out infinite;
 }
 
 .gallery-frame__dot[data-status='error'] {
-  background: #ff5c5c;
-  box-shadow: 0 0 8px #ff5c5c;
+  background: #b3543f;
+  box-shadow: 0 0 8px #b3543f;
 }
 
 .gallery-frame__dot[data-status='loading'] {
-  background: #ffd25c;
-  box-shadow: 0 0 8px #ffd25c;
+  background: #c99a4b;
+  box-shadow: 0 0 8px #c99a4b;
   animation: pulse 1s ease-in-out infinite;
 }
 
@@ -118,8 +121,8 @@ body {
   bottom: 0;
   padding: 10px 14px;
   font-size: 12px;
-  color: #c6cbdb;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  color: #ead9be;
+  background: linear-gradient(to top, rgba(26, 18, 11, 0.8), transparent);
   min-height: 14px;
 }
 
@@ -151,8 +154,8 @@ body {
   height: 6px;
   margin: -3px 0 0 -3px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+  background: rgba(239, 228, 211, 0.75);
+  box-shadow: 0 0 6px rgba(239, 228, 211, 0.5);
 }
 
 .hud__title {
@@ -161,10 +164,11 @@ body {
   left: 20px;
   padding: 10px 16px;
   background: var(--panel-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
   backdrop-filter: blur(6px);
   max-width: 320px;
+  color: var(--panel-text);
 }
 
 .hud__title h1 {
@@ -185,8 +189,8 @@ body {
   left: 20px;
   padding: 10px 16px;
   background: var(--panel-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
   backdrop-filter: blur(6px);
   font-size: 12px;
   color: var(--muted);
@@ -197,11 +201,11 @@ body {
   display: inline-block;
   padding: 1px 6px;
   margin: 0 2px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(58, 42, 27, 0.08);
+  border: 1px solid rgba(58, 42, 27, 0.22);
   border-radius: 4px;
   font-size: 11px;
-  color: var(--text);
+  color: var(--panel-text);
 }
 
 .hud__focus {
@@ -211,9 +215,10 @@ body {
   max-width: 340px;
   padding: 14px 18px;
   background: var(--panel-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
   backdrop-filter: blur(6px);
+  color: var(--panel-text);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.25s ease, transform 0.25s ease;
@@ -242,7 +247,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(3, 4, 9, 0.55);
+  background: rgba(22, 17, 12, 0.55);
   backdrop-filter: blur(2px);
   z-index: 20;
   pointer-events: auto;
@@ -259,8 +264,9 @@ body {
 .hud__lock-prompt-inner {
   padding: 28px 36px;
   background: var(--panel-bg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  color: var(--panel-text);
 }
 
 .hud__lock-prompt-inner h2 {
